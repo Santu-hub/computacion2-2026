@@ -7,8 +7,8 @@ from analizadores.resumen import analizador_resumen
 from display import tui_loop
 from analizadores.memoria import analizador_memoria
 from analizadores.fds import analizador_fds
+from analizadores.threads import analizador_threads
 
-# Variables globales para el shutdown limpio
 procesos = []
 evento_salida = None
 
@@ -30,6 +30,7 @@ def main():
         'resumen': multiprocessing.Value('d', 2.0),
         'memoria': multiprocessing.Value('d', 3.0),
         'fds': multiprocessing.Value('d', 3.0),
+        'threads': multiprocessing.Value('d', 2.5),
     }
     
     # 2. Registrar Señales
@@ -57,6 +58,13 @@ def main():
     )
     p_fds.start()
     procesos.append(p_fds)
+
+    p_threads = multiprocessing.Process(
+        target=analizador_threads,
+        args=(snapshot, intervalos['threads'], evento_salida)
+    )
+    p_threads.start()
+    procesos.append(p_threads)
 
     # Lanzar display (bloquea el hilo principal hasta que termine)
     try:

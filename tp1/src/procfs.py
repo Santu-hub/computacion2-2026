@@ -86,3 +86,45 @@ def leer_fds(pid):
         
     except (FileNotFoundError, PermissionError):
         return None
+
+def leer_threads(pid):
+    """Lee /proc/<pid>/task/ para extraer los hilos de un proceso."""
+    hilos_data = []
+    task_dir = f"/proc/{pid}/task/"
+    
+    try:
+        # Chequeamos si la carpeta existe y tenemos permisos
+        if not os.path.isdir(task_dir) or not os.access(task_dir, os.R_OK):
+            return None
+            
+        for tid in os.listdir(task_dir):
+            if not tid.isdigit():
+                continue
+                
+            # Leemos el archivo stat específico de este hilo
+            try:
+                with open(f"{task_dir}{tid}/stat", "r") as f:
+                    contenido = f.read().strip()
+                    parte_izq, parte_der = contenido.split(') ', 1)
+                    comando = parte_izq.split(' (')[1]
+                    campos = parte_der.split()
+                    
+                    estado = campos[0]
+                    # Tiempo de CPU (sumando tiempo de usuario y sistema en 'ticks')
+                    tiempo_cpu = int(campos[11]) + int(campos[12])
+                    
+                    hilos_data.append({
+                        "tid": tid,
+                        "comando": comando,
+                        "estado": estado,
+                        "tiempo_cpu": tiempo_cpu
+                    })
+            except (FileNotFoundError, IndexError):
+                pass
+                
+        if hilos_data:
+            return {"pid": pid, "hilos": hilos_data}
+        return None
+        
+    except (FileNotFoundError, PermissionError):
+        return None
