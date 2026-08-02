@@ -27,10 +27,21 @@ def tui_loop(stdscr, snapshot, intervalos, evento_salida):
                 
                 datos = snapshot.get('resumen', [])
                 fila = 4
-                
                 if altura > 6:
                     for proc in datos[:altura-6]: 
                         linea = f"{proc['pid']:<8} {proc['estado']:<8} {proc['threads']:<8} {proc['comando']}"
+                        stdscr.addstr(fila, 0, linea[:anchura-1])
+                        fila += 1
+                        
+            elif vista_activa == 'memoria':
+                stdscr.addstr(2, 0, f"{'PID':<8} {'NOMBRE':<16} {'VIRTUAL(KB)':<15} {'RSS(KB)':<15} {'SWAP(KB)'}")
+                stdscr.addstr(3, 0, "-" * (anchura-1))
+                
+                datos = snapshot.get('memoria', [])
+                fila = 4
+                if altura > 6:
+                    for proc in datos[:altura-6]:
+                        linea = f"{proc['pid']:<8} {proc['nombre'][:15]:<16} {proc['vmsize']:<15} {proc['vmrss']:<15} {proc['vmswap']}"
                         stdscr.addstr(fila, 0, linea[:anchura-1])
                         fila += 1
                         
@@ -48,6 +59,8 @@ def tui_loop(stdscr, snapshot, intervalos, evento_salida):
             break
         elif tecla == ord('1') or tecla == ord('r'):
             vista_activa = 'resumen'
+        elif tecla == ord('2') or tecla == ord('m'):
+            vista_activa = 'memoria'
         elif tecla == ord('+'):
             intervalos[vista_activa].value += 0.5
         elif tecla == ord('-'):

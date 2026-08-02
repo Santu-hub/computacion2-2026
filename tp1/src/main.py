@@ -5,6 +5,7 @@ import curses
 import os
 from analizadores.resumen import analizador_resumen
 from display import tui_loop
+from analizadores.memoria import analizador_memoria
 
 # Variables globales para el shutdown limpio
 procesos = []
@@ -41,6 +42,14 @@ def main():
     )
     p_resumen.start()
     procesos.append(p_resumen)
+    
+    p_memoria = multiprocessing.Process(
+        target=analizador_memoria,
+        args=(snapshot, intervalos['memoria'], evento_salida)
+    )
+    p_memoria.start()
+    procesos.append(p_memoria)
+   
     
     # Lanzar display (bloquea el hilo principal hasta que termine)
     try:

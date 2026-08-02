@@ -28,3 +28,23 @@ def leer_stat(pid):
             }
     except (FileNotFoundError, ProcessLookupError, IndexError):
         return None
+
+def leer_memoria(pid):
+    """Lee /proc/<pid>/status para extraer estadísticas de memoria."""
+    # Valores por defecto por si el proceso no tiene memoria asignada (ej. procesos del kernel)
+    mem_data = {"pid": pid, "nombre": "", "vmsize": "0", "vmrss": "0", "vmswap": "0"}
+    
+    try:
+        with open(f"/proc/{pid}/status", "r") as f:
+            for linea in f:
+                if linea.startswith("Name:"):
+                    mem_data["nombre"] = linea.split()[1]
+                elif linea.startswith("VmSize:"):
+                    mem_data["vmsize"] = linea.split()[1] # Está en kB
+                elif linea.startswith("VmRSS:"):
+                    mem_data["vmrss"] = linea.split()[1]
+                elif linea.startswith("VmSwap:"):
+                    mem_data["vmswap"] = linea.split()[1]
+        return mem_data
+    except FileNotFoundError:
+        return None

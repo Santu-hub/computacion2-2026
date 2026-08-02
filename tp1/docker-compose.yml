@@ -1,0 +1,8 @@
+services:
+  monitor:
+    build: .
+    stdin_open: true 
+    tty: true
+    pid: "host"
+    environment:
+      - TERM=xterm-256color
