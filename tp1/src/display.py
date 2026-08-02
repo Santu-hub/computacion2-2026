@@ -45,6 +45,25 @@ def tui_loop(stdscr, snapshot, intervalos, evento_salida):
                         stdscr.addstr(fila, 0, linea[:anchura-1])
                         fila += 1
                         
+            elif vista_activa == 'fds':
+                stdscr.addstr(2, 0, f"{'PID':<8} {'FD':<6} {'TIPO':<15} {'DESTINO'}")
+                stdscr.addstr(3, 0, "-" * (anchura-1))
+                
+                datos = snapshot.get('fds', [])
+                fila = 4
+                
+                if altura > 6:
+                    for proc in datos:
+                        for fd_info in proc['fds']:
+                            if fila >= altura - 1:
+                                break # Frenamos si tocamos el borde de abajo
+                                
+                            linea = f"{proc['pid']:<8} {fd_info['fd']:<6} {fd_info['tipo']:<15} {fd_info['destino']}"
+                            stdscr.addstr(fila, 0, linea[:anchura-1])
+                            fila += 1
+                        if fila >= altura - 1:
+                            break
+                        
         except curses.error:
             pass # Ignoramos errores temporales al redimensionar muy brusco
             
@@ -61,6 +80,8 @@ def tui_loop(stdscr, snapshot, intervalos, evento_salida):
             vista_activa = 'resumen'
         elif tecla == ord('2') or tecla == ord('m'):
             vista_activa = 'memoria'
+        elif tecla == ord('3') or tecla == ord('f'):
+            vista_activa = 'fds'
         elif tecla == ord('+'):
             intervalos[vista_activa].value += 0.5
         elif tecla == ord('-'):

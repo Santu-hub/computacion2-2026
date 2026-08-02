@@ -6,6 +6,7 @@ import os
 from analizadores.resumen import analizador_resumen
 from display import tui_loop
 from analizadores.memoria import analizador_memoria
+from analizadores.fds import analizador_fds
 
 # Variables globales para el shutdown limpio
 procesos = []
@@ -28,7 +29,7 @@ def main():
     intervalos = {
         'resumen': multiprocessing.Value('d', 2.0),
         'memoria': multiprocessing.Value('d', 3.0),
-        # Agregar los demás acá...
+        'fds': multiprocessing.Value('d', 3.0),
     }
     
     # 2. Registrar Señales
@@ -42,15 +43,21 @@ def main():
     )
     p_resumen.start()
     procesos.append(p_resumen)
-    
+
     p_memoria = multiprocessing.Process(
         target=analizador_memoria,
         args=(snapshot, intervalos['memoria'], evento_salida)
     )
     p_memoria.start()
     procesos.append(p_memoria)
-   
-    
+
+    p_fds = multiprocessing.Process(
+        target=analizador_fds,
+        args=(snapshot, intervalos['fds'], evento_salida)
+    )
+    p_fds.start()
+    procesos.append(p_fds)
+
     # Lanzar display (bloquea el hilo principal hasta que termine)
     try:
         curses.wrapper(tui_loop, snapshot, intervalos, evento_salida)

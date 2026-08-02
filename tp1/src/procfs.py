@@ -48,3 +48,41 @@ def leer_memoria(pid):
         return mem_data
     except FileNotFoundError:
         return None
+
+def leer_fds(pid):
+    """Lee /proc/<pid>/fd/ para listar los archivos abiertos y clasificar su tipo."""
+    fds_data = []
+    fd_dir = f"/proc/{pid}/fd/"
+    
+    try:
+        # Primero chequeamos si tenemos permisos (procesos de root nos van a rebotar)
+        if not os.access(fd_dir, os.R_OK):
+            return None 
+            
+        for fd_num in os.listdir(fd_dir):
+            ruta_absoluta = os.path.join(fd_dir, fd_num)
+            try:
+                # os.readlink nos dice a dónde apunta realmente el acceso directo
+                destino = os.readlink(ruta_absoluta)
+                
+                # Inferimos el tipo según el texto
+                tipo = "Desconocido"
+                if destino.startswith("/dev/pts/") or destino.startswith("/dev/tty"):
+                    tipo = "Terminal"
+                elif destino.startswith("pipe:"):
+                    tipo = "Pipe"
+                elif destino.startswith("socket:"):
+                    tipo = "Socket"
+                elif destino.startswith("/"):
+                    tipo = "Archivo"
+                    
+                fds_data.append({"fd": fd_num, "destino": destino, "tipo": tipo})
+                
+            except OSError:
+                # Si el proceso cerró el archivo justo mientras lo leíamos, lo ignoramos
+                pass
+                
+        return {"pid": pid, "fds": fds_data}
+        
+    except (FileNotFoundError, PermissionError):
+        return None
