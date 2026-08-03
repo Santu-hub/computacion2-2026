@@ -8,3 +8,4 @@ dumps/*
 !dumps/.gitkeep
 
 *.log
+GUIA.md

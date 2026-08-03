@@ -271,20 +271,6 @@ correcta es buscar el **último** `)` de la línea, porque después del comm el
 formato ya no tiene paréntesis. Hay un test específico para este caso
 (`test_comm_con_parentesis_y_espacio_juntos`).
 
-**Clase 3 — Memoria virtual.** La vista Memoria muestra la diferencia entre
-`VmSize` (espacio de direcciones virtual reservado) y `VmRSS` (páginas
-realmente residentes en RAM). Un proceso puede tener 2 GB de VmSize y 30 MB
-de RSS: reservó direcciones que nunca tocó, y el kernel no le asignó marcos
-físicos. En `leer_segmentos_maps()` agrupo `/proc/<pid>/maps` por permisos,
-que es literalmente ver el layout que vimos en clase: `r-x` es el segmento
-de texto (código), `rw-` sin ejecución son los datos, más `[heap]` y
-`[stack]` explícitos.
-
-**Clase 3 — Page faults.** La vista Memoria distingue minor de major faults.
-Un *minor fault* es una página que estaba en RAM pero sin mapear en la tabla
-del proceso (barato); un *major fault* obligó a ir al disco (carísimo). Por
-eso un proceso con muchos major faults es un proceso que está swapeando o
-leyendo mmaps fríos.
 
 **Clase 4 — fork, exec, wait: zombies.** La vista Sistema cuenta los procesos
 en estado `Z`. Un zombie es un proceso que ya terminó pero cuyo padre todavía
@@ -293,12 +279,6 @@ procesos para guardar el exit status. Lo notable es que un zombie tiene RSS 0
 (ya liberó su memoria) pero sigue ocupando un PID: por eso el monitor los
 resalta con `A_BLINK` en la lista.
 
-**Clase 4 — Jerarquía de procesos.** La vista Resumen muestra el PPID. En la
-vista Scheduling muestro además PGID y SID, que son lo que define los grupos
-de procesos y las sesiones: cuando apretás Ctrl+C, la terminal manda SIGINT a
-**todo el grupo de procesos en foreground**, no a un proceso solo. Eso explica
-por qué mis analizadores tienen que ignorar SIGINT explícitamente (ver más
-abajo).
 
 **Clase 5 — Pipes y file descriptors.** La vista FDs es directamente esto:
 `os.readlink('/proc/<pid>/fd/<n>')` devuelve `pipe:[12345]` para un pipe,
@@ -315,19 +295,6 @@ en el bit 0, así que la máscara `0x2` es SIGINT (señal 2, bit 1), no SIGHUP.
 Los bits altos son señales de tiempo real que no tienen nombre simbólico y las
 muestro como `SIG34`, `SIG35`, etc.
 
-**Clase 6 — Handlers async-signal-safe y self-pipe.** Esto es lo que más me
-cambió la cabeza. Un handler se ejecuta interrumpiendo cualquier cosa, así que
-si el handler llama a `print()` o `json.dump()` y justo interrumpió al programa
-principal en medio de un `malloc()` o con un lock de la libc tomado, se puede
-deadlockear o corromper memoria. Sólo se pueden llamar funciones
-async-signal-safe (`write`, `_exit`, `sigaction`...).
-
-Mi handler hace exactamente una cosa:
-
-```python
-def _handler(signum, frame):
-    os.write(_pipe_escritura, bytes([signum]))
-```
 
 El trabajo pesado (releer `config.json`, escribir el dump JSON) lo hace el
 loop de la TUI cuando lee ese byte del pipe, ya en contexto normal. Como
@@ -351,18 +318,6 @@ re-serializarlos.
 esta clase aplicada: qué dato va a memoria compartida real y cuál necesita el
 proceso servidor del Manager.
 
-**Clase 10 — Threading, GIL y threads como LWPs.** La vista Threads muestra
-que en Linux **un thread es un proceso liviano (LWP) con su propio TID**, y
-que aparece en `/proc/<pid>/task/<tid>/`. El thread principal siempre tiene
-`TID == PID` (lo marco con `<- main` en pantalla). Esto explica de forma
-concreta la diferencia entre PID y TID que en el papel es abstracta.
-
-También conecta con el GIL: si abrís un programa Python multithread CPU-bound
-en la vista Threads, vas a ver varios TIDs pero la suma de sus CPU% no pasa
-del 100% de un core, porque el GIL serializa la ejecución de bytecode. Un
-programa en C o Rust con la misma cantidad de threads sí pasa del 100%.
-(En el `/proc` de este contenedor se puede ver con `rclone`, que tiene 22
-threads reales.)
 
 **Clase 11 — Sincronización.** La decisión de fondo del TP: en vez de poner
 `Lock` sobre el snapshot, lo diseñé con **un único escritor**, que es una
@@ -372,43 +327,8 @@ apagado de los 9 hijos.
 
 ---
 
-## 5. Señales
 
-| Señal | Acción |
-|-------|--------|
-| `SIGINT` (Ctrl+C) | Shutdown limpio: setea el Event, vacía las Queues, joinea los hijos |
-| `SIGTERM` | Igual que SIGINT |
-| `SIGHUP` | Relee `config.json` y aplica los intervalos, filtros y orden nuevos |
-| `SIGUSR1` | Vuelca el snapshot completo a `dumps/dump_<timestamp>.json` |
-| `SIGUSR2` | Toggle del modo verbose (más FDs visibles por proceso) |
-| `SIGWINCH` | Repinta la pantalla al redimensionar la terminal |
-
-Para probarlas, desde otra terminal:
-
-```bash
-# el PID del monitor dentro del contenedor
-docker compose exec monitor pgrep -f "python3 main.py" | head -1
-
-kill -HUP  <pid>   # recarga config.json (editalo antes y vas a ver el cambio)
-kill -USR1 <pid>   # aparece un JSON en ./dumps/
-kill -USR2 <pid>   # la barra de estado muestra "verbose: ON"
-kill -TERM <pid>   # cierre limpio
-```
-
-### Detalle: por qué los hijos ignoran SIGINT
-
-Cuando apretás Ctrl+C, la terminal manda SIGINT a **todo el grupo de procesos
-en foreground**, no sólo al padre. Como los hijos heredan los handlers del
-padre en el `fork()`, cada uno de los 9 ejecutaría el handler del padre y
-escribiría en el self-pipe, lo cual no tiene sentido.
-
-Por eso cada hijo hace `signal.signal(SIGINT, SIG_IGN)` al arrancar y confía
-en el `Event` compartido para saber cuándo terminar. El apagado tiene un
-único responsable: el padre.
-
----
-
-## 6. Limitaciones conocidas
+## 5. Limitaciones conocidas
 
 1. **`/proc` no es atómico y los PIDs se reciclan.** Entre leer `stat` y
    `status` del mismo PID, el proceso puede morir y el kernel puede reasignar
@@ -459,7 +379,7 @@ en el `Event` compartido para saber cuándo terminar. El apagado tiene un
 
 ---
 
-## 7. Cómo correr y testear
+## 6. Cómo correr y testear
 
 ### Con Docker (forma recomendada)
 
@@ -468,14 +388,6 @@ git clone <url-del-repo>
 cd <repo>
 docker compose up --build
 ```
-
-`docker-compose.yml` usa `pid: "host"`, que hace que el contenedor comparta el
-namespace de PIDs del host. Sin eso, `/proc` sólo mostraría los procesos de
-adentro del contenedor (unos pocos) y el monitor sería bastante aburrido.
-
-También monta `./config.json` y `./dumps/` como volúmenes, así podés editar la
-config desde el host y recargarla con SIGHUP sin reconstruir la imagen, y los
-dumps de SIGUSR1 te quedan accesibles.
 
 ### Sin Docker
 
@@ -487,136 +399,3 @@ python3 main.py
 Requiere Python 3.11+ y Linux. No hay dependencias externas: `curses` es
 stdlib.
 
-### Cómo verificar que los datos son correctos
-
-La forma más honesta de testear el monitor es comparar contra las herramientas
-reales. Dentro del contenedor está `procps` instalado justamente para eso:
-
-```bash
-docker compose exec monitor bash
-
-ps -eLf | wc -l                    # vs "Threads" de la vista Sistema
-ps -o pid,ppid,state,nice,pri -e   # vs las vistas Resumen y Scheduling
-cat /proc/loadavg                  # vs el load average de la vista Sistema
-ls -l /proc/1/fd/                  # vs la vista FDs para el PID 1
-chrt -p 1                          # vs la política de la vista Scheduling
-```
-
-Para ver el monitor reaccionar, generá carga:
-
-```bash
-# CPU-bound: subí la vista Sistema y mirá el CPU% y los ctx switches involuntarios
-yes > /dev/null &
-
-# Un zombie: la vista Sistema debería contarlo
-python3 -c "import os,time; os.fork() or time.sleep(60)" &
-```
-
----
-
-## 8. Decisiones sobre la TUI
-
-**`curses` y no `rich`.** `rich` da colores y tablas más lindas con menos
-código, pero está pensado para *renderizar salida*, no para una aplicación
-interactiva con teclado: para eso hay que combinarlo con `prompt_toolkit` o
-un loop propio. `curses` es la herramienta nativa para esto, maneja el
-teclado sin bloquear (`timeout()`), y sobre todo es **una interfaz directa a
-terminfo**, que es más coherente con el espíritu del TP de tocar las cosas a
-bajo nivel. Además evita agregar dependencias: `requirements.txt` quedó vacío.
-
-**Layout de lista arriba y detalle abajo.** La consigna lo pide así, pero
-además tiene sentido: la lista da el contexto ("¿qué proceso miro?") y el
-detalle da la profundidad. La lista ocupa un tercio y el detalle dos tercios,
-porque los paneles de FDs y Threads necesitan lugar.
-
-**Un problema real que encontré con las flechas.** Al principio tenía la tecla
-ESC (código 27) como sinónimo de "salir". Resulta que las flechas mandan
-secuencias que **empiezan con ESC** (`ESC [ B` para abajo), así que si curses
-llegaba a entregar ese byte suelto, el monitor se cerraba al apretar una
-flecha. Lo saqué, y además agregué en `_leer_tecla()` un fallback que decodifica
-a mano las secuencias `ESC [ x` y `ESC O x`, porque según el terminfo y si estás
-en tmux o no, la terminal manda una u otra forma.
-
----
-
-## 9. Lo que aprendí
-
-Lo que más me sorprendió fue **cuánto de un proceso es simplemente texto en
-un directorio**. Uno estudia que el kernel mantiene una estructura de datos
-por proceso, pero verlo como archivos que podés `cat` es otra cosa. Y entender
-que `/proc` no es un directorio de verdad —no ocupa disco, se genera al
-momento en que lo leés— explica por qué las lecturas no son atómicas: cada
-`open()` dispara código del kernel que arma la respuesta ahí mismo.
-
-El concepto que más me costó, y el que creo que más me sirvió, fue el de
-**async-signal-safety**. Yo venía asumiendo que un handler de señal era
-"código normal que corre cuando llega la señal". Entender que interrumpe al
-programa en un punto arbitrario —posiblemente en medio de un `malloc()` con
-un lock tomado— y que por eso ni siquiera podés hacer un `print()`, me cambió
-la forma de pensar la concurrencia. El self-pipe es una solución elegantísima:
-convierte un evento asincrónico e incómodo en un file descriptor legible, que
-es algo que el event loop ya sabe manejar. Pasar de "flag global + polling" a
-"un byte en un pipe que despierta el `select()`" fue el momento en que la
-clase 6 me hizo clic.
-
-La tercera cosa fue darme cuenta de que **la mejor sincronización es la que no
-hace falta escribir**. Mi primer diseño tenía a los 7 analizadores escribiendo
-el `Manager.dict`, y me puse a pensar dónde poner locks para que no se
-pisaran. Cuando reordené la arquitectura para que hubiera un único escritor
-(el agregador), el problema simplemente dejó de existir: no hay ningún `Lock`
-en todo el código, y no porque haya ignorado el problema, sino porque el flujo
-de datos está diseñado para que no aparezca. Ahora entiendo mucho mejor por
-qué el modelo de actores y los canales de Go existen: es esta misma idea,
-sistematizada.
-
----
-
-## 10. Estructura del repo
-
-```
-.
-├── README.md                    ← este informe
-├── dudas.md                     ← lo que me quedó sin resolver
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt             ← vacío a propósito: sólo stdlib
-├── config.json                  ← intervalos, mínimos, filtros, verbose
-├── src/
-│   ├── main.py                  ← entry point, IPC, watchdog, apagado
-│   ├── recolector.py            ← lista /proc y reparte PIDs
-│   ├── agregador.py             ← único escritor del snapshot
-│   ├── display.py               ← TUI curses
-│   ├── procfs.py                ← todo el parseo de /proc
-│   ├── senales.py               ← self-pipe, config, dump
-│   └── analizadores/
-│       ├── resumen.py
-│       ├── memoria.py
-│       ├── fds.py
-│       ├── threads.py
-│       ├── senales.py
-│       ├── scheduling.py
-│       └── sistema.py
-└── dumps/                       ← acá caen los dumps de SIGUSR1
-```
-
----
-
-## 11. Extensiones opcionales
-
-No implementé ninguna de las extensiones opcionales de la consigna. Preferí
-concentrarme en que lo obligatorio quedara sólido y en poder explicar cada
-decisión del código.
-
-Una cosa que sí agregué, aunque no está en la lista de extensiones, es un
-**watchdog de procesos hijos**: el padre chequea cada 2 segundos que los 9
-hijos sigan vivos y relanza al que se haya caído, avisando en pantalla. No lo
-cuento como bonus; lo hice porque un monitor que se queda mudo cuando un
-analizador muere no sirve de mucho. Se puede probar con:
-
-```bash
-# desde otra terminal, matar un analizador a lo bruto
-pkill -9 -f "analizador-memoria"
-```
-
-En menos de 2 segundos la vista Memoria vuelve a actualizarse y la barra
-inferior muestra el aviso del watchdog.
