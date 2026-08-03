@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+
+# Los dumps de SIGUSR1 son datos generados, no van al repo.
+# Pero la carpeta sí tiene que existir, porque docker-compose la monta
+# como volumen: por eso se ignora el contenido y no el directorio.
+dumps/*
+!dumps/.gitkeep
+
+*.log

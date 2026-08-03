@@ -1,8 +1,24 @@
 services:
   monitor:
     build: .
-    stdin_open: true 
+    container_name: monitor-proc
+
+    # Interactivo: la TUI necesita un tty real para curses.
+    stdin_open: true
     tty: true
+
+    # pid: "host" hace que el contenedor comparta el namespace de PIDs del
+    # host, así /proc muestra TODOS los procesos de la máquina y no sólo los
+    # cuatro que corren adentro del contenedor. Sin esto el monitor es
+    # bastante aburrido.
     pid: "host"
+
     environment:
       - TERM=xterm-256color
+
+    volumes:
+      # Montado como archivo para poder editarlo desde el host y recargarlo
+      # en vivo con SIGHUP sin reconstruir la imagen.
+      - ./config.json:/app/config.json
+      # Los dumps de SIGUSR1 quedan accesibles desde el host.
+      - ./dumps:/app/dumps

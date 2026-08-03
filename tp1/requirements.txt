@@ -1,0 +1,5 @@
+# Sin dependencias externas.
+#
+# La TUI usa `curses`, que es parte de la stdlib de Python en Linux.
+# La consigna prohíbe psutil y equivalentes, y todo el parseo de /proc
+# está hecho a mano en src/procfs.py.
