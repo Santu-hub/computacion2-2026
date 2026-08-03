@@ -1,4 +1,6 @@
 import os
+import signal
+
 
 def obtener_pids():
     """Devuelve una lista con los PIDs numéricos de /proc."""
@@ -128,3 +130,137 @@ def leer_threads(pid):
         
     except (FileNotFoundError, PermissionError):
         return None
+import signal
+
+def decodificar_mascara(mascara_hex):
+    """Convierte una máscara hexadecimal en nombres de señales legibles."""
+    try:
+        mascara = int(mascara_hex, 16)
+    except ValueError:
+        return "-"
+        
+    if mascara == 0:
+        return "-"
+        
+    nombres_senales = []
+    # Revisamos los 64 bits posibles
+    for i in range(1, 65): 
+        if mascara & (1 << (i - 1)):
+            try:
+                # Intenta sacar el nombre oficial (ej: SIGKILL, SIGTERM)
+                nombre = signal.Signals(i).name
+                nombres_senales.append(nombre)
+            except ValueError:
+                # Si es una señal extraña o de tiempo real, ponemos su número
+                nombres_senales.append(f"SIG{i}")
+                
+    return ",".join(nombres_senales)
+
+def leer_senales(pid):
+    """Lee /proc/<pid>/status para extraer las máscaras de señales."""
+    senales_data = {"pid": pid, "pendientes": "-", "bloqueadas": "-", "ignoradas": "-", "capturadas": "-"}
+    try:
+        with open(f"/proc/{pid}/status", "r") as f:
+            for linea in f:
+                if linea.startswith("SigPnd:"):
+                    senales_data["pendientes"] = decodificar_mascara(linea.split()[1])
+                elif linea.startswith("SigBlk:"):
+                    senales_data["bloqueadas"] = decodificar_mascara(linea.split()[1])
+                elif linea.startswith("SigIgn:"):
+                    senales_data["ignoradas"] = decodificar_mascara(linea.split()[1])
+                elif linea.startswith("SigCgt:"):
+                    senales_data["capturadas"] = decodificar_mascara(linea.split()[1])
+        return senales_data
+    except FileNotFoundError:
+        return None
+
+def leer_scheduling(pid):
+    """Lee estadísticas de planificación de CPU de un proceso."""
+    sched_data = {"pid": pid, "prioridad": "-", "nice": "-", "politica": "-", "afinidad": "-", "ctx_switches": "0"}
+    try:
+        # 1. Leer stat para prioridad (campo 18), nice (campo 19) y politica (campo 41)
+        with open(f"/proc/{pid}/stat", "r") as f:
+            contenido = f.read().strip()
+            # Cortamos a partir del nombre del proceso para no desfasar índices si el nombre tiene espacios
+            parte_der = contenido.split(') ')[1]
+            campos = parte_der.split()
+            
+            sched_data["prioridad"] = campos[15] # Índice 15 es el campo 18
+            sched_data["nice"] = campos[16]      # Índice 16 es el campo 19
+            
+            if len(campos) > 38:
+                # Decodificamos las políticas más comunes de Linux
+                pol = campos[38]
+                politicas = {"0": "OTHER", "1": "FIFO", "2": "RR", "3": "BATCH", "5": "IDLE"}
+                sched_data["politica"] = politicas.get(pol, pol)
+
+        # 2. Leer status para afinidad (Cpus_allowed_list) y context switches
+        vol_ctx = 0
+        nonvol_ctx = 0
+        with open(f"/proc/{pid}/status", "r") as f:
+            for linea in f:
+                if linea.startswith("Cpus_allowed_list:"):
+                    sched_data["afinidad"] = linea.split()[1]
+                elif linea.startswith("voluntary_ctxt_switches:"):
+                    vol_ctx = int(linea.split()[1])
+                elif linea.startswith("nonvoluntary_ctxt_switches:"):
+                    nonvol_ctx = int(linea.split()[1])
+        
+        # Sumamos los voluntarios y los involuntarios
+        sched_data["ctx_switches"] = str(vol_ctx + nonvol_ctx)
+        
+        return sched_data
+    except (FileNotFoundError, IndexError):
+        return None
+
+def leer_sistema():
+    """Lee estadísticas globales del sistema desde múltiples archivos."""
+    sys_data = {}
+    
+    # 1. Load Average (Carga promedio)
+    try:
+        with open('/proc/loadavg', 'r') as f:
+            sys_data['load'] = f.read().split()[:3]
+    except FileNotFoundError:
+        sys_data['load'] = ['0.00', '0.00', '0.00']
+        
+    # 2. Memoria RAM
+    try:
+        with open('/proc/meminfo', 'r') as f:
+            mem = {}
+            for linea in f:
+                partes = linea.split()
+                # Limpiamos los dos puntos y guardamos el valor en KB
+                mem[partes[0].replace(':', '')] = int(partes[1])
+            
+            total = mem.get('MemTotal', 1)
+            # Usamos MemAvailable si existe (Linux moderno), sino MemFree
+            libre = mem.get('MemAvailable', mem.get('MemFree', 0))
+            usada = total - libre
+            
+            sys_data['ram_total'] = total
+            sys_data['ram_usada'] = usada
+            sys_data['ram_porcentaje'] = (usada / total) * 100
+    except FileNotFoundError:
+        sys_data['ram_total'] = sys_data['ram_usada'] = sys_data['ram_porcentaje'] = 0
+        
+    # 3. CPU y Procesos Totales
+    try:
+        with open('/proc/stat', 'r') as f:
+            for linea in f:
+                if linea.startswith('cpu '):
+                    # Sumamos los tiempos (ticks) de CPU
+                    tiempos = [float(x) for x in linea.split()[1:]]
+                    idle = tiempos[3] + tiempos[4] # idle + iowait
+                    total = sum(tiempos)
+                    sys_data['cpu_tiempos'] = (idle, total)
+                elif linea.startswith('procs_running'):
+                    sys_data['procs_running'] = linea.split()[1]
+                elif linea.startswith('procs_blocked'):
+                    sys_data['procs_blocked'] = linea.split()[1]
+    except FileNotFoundError:
+        sys_data['cpu_tiempos'] = (0, 0)
+        sys_data['procs_running'] = '0'
+        sys_data['procs_blocked'] = '0'
+        
+    return sys_data

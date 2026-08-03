@@ -8,6 +8,9 @@ from display import tui_loop
 from analizadores.memoria import analizador_memoria
 from analizadores.fds import analizador_fds
 from analizadores.threads import analizador_threads
+from analizadores.senales import analizador_senales
+from analizadores.scheduling import analizador_scheduling
+from analizadores.sistema import analizador_sistema
 
 procesos = []
 evento_salida = None
@@ -31,6 +34,9 @@ def main():
         'memoria': multiprocessing.Value('d', 3.0),
         'fds': multiprocessing.Value('d', 3.0),
         'threads': multiprocessing.Value('d', 2.5),
+        'senales': multiprocessing.Value('d', 10),
+        'scheduling': multiprocessing.Value('d', 10.0),
+        'sistema': multiprocessing.Value('d', 2.0),
     }
     
     # 2. Registrar Señales
@@ -65,6 +71,27 @@ def main():
     )
     p_threads.start()
     procesos.append(p_threads)
+
+    p_senales = multiprocessing.Process(
+        target=analizador_senales,
+        args=(snapshot, intervalos['senales'], evento_salida)
+    )
+    p_senales.start()
+    procesos.append(p_senales)
+
+    p_scheduling = multiprocessing.Process(
+        target=analizador_scheduling,
+        args=(snapshot, intervalos['scheduling'], evento_salida)
+    )
+    p_scheduling.start()
+    procesos.append(p_scheduling)
+
+    p_sistema = multiprocessing.Process(
+        target=analizador_sistema,
+        args=(snapshot, intervalos['sistema'], evento_salida)
+    )
+    p_sistema.start()
+    procesos.append(p_sistema)
 
     # Lanzar display (bloquea el hilo principal hasta que termine)
     try:
