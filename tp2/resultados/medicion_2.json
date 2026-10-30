@@ -1,0 +1,71 @@
+{
+  "maquina": {
+    "python": "3.12.3",
+    "plataforma": "Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "nucleos": 12
+  },
+  "iteraciones_por_s": 1913341,
+  "iteraciones": 11480047,
+  "corridas": [
+    {
+      "modo": "bloqueante",
+      "estado_final": "completada",
+      "post_ms": 5.03,
+      "tarea_total_s": 6.25,
+      "sin_carga": {
+        "n": 66,
+        "p50_ms": 2.54,
+        "p95_ms": 3.01,
+        "p99_ms": 3.57,
+        "max_ms": 3.57
+      },
+      "con_carga": {
+        "n": 1,
+        "p50_ms": 6246.49,
+        "p95_ms": 6246.49,
+        "p99_ms": 6246.49,
+        "max_ms": 6246.49
+      }
+    },
+    {
+      "modo": "hilo",
+      "estado_final": "completada",
+      "post_ms": 3.77,
+      "tarea_total_s": 7.46,
+      "sin_carga": {
+        "n": 65,
+        "p50_ms": 2.57,
+        "p95_ms": 2.99,
+        "p99_ms": 3.09,
+        "max_ms": 3.09
+      },
+      "con_carga": {
+        "n": 192,
+        "p50_ms": 17.86,
+        "p95_ms": 28.07,
+        "p99_ms": 34.92,
+        "max_ms": 49.51
+      }
+    },
+    {
+      "modo": "proceso",
+      "estado_final": "completada",
+      "post_ms": 3.99,
+      "tarea_total_s": 6.41,
+      "sin_carga": {
+        "n": 66,
+        "p50_ms": 2.42,
+        "p95_ms": 3.01,
+        "p99_ms": 3.57,
+        "max_ms": 3.57
+      },
+      "con_carga": {
+        "n": 287,
+        "p50_ms": 1.63,
+        "p95_ms": 2.65,
+        "p99_ms": 3.3,
+        "max_ms": 3.61
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+
+# Los volcados de estado son datos generados, no van al repo. La carpeta sí
+# tiene que existir porque docker compose la monta como volumen.
+datos/*
+!datos/.gitkeep
+
+*.log

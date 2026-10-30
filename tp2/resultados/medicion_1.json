@@ -1,0 +1,65 @@
+{
+  "maquina": {
+    "python": "3.12.3",
+    "plataforma": "Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "nucleos": 12
+  },
+  "descargas": 20,
+  "latencia_servidor_ms": 500,
+  "repeticiones": 3,
+  "libreria": {
+    "for_await_s": [
+      10.054391806000012,
+      10.053822502000003,
+      10.051885710000079
+    ],
+    "gather_s": [
+      0.5156335849999323,
+      0.5115297320000991,
+      0.512979550999944
+    ],
+    "speedup": 19.6
+  },
+  "api": {
+    "A) secuencial: WORKERS=1, 20 tareas de 1 URL": {
+      "tiempos_s": [
+        10.088,
+        10.078,
+        10.093
+      ],
+      "mediana_s": 10.088,
+      "speedup_vs_A": 1.0
+    },
+    "B) concurrente en la tarea: 1 tarea con 20 URLs": {
+      "tiempos_s": [
+        0.556,
+        0.547,
+        0.563
+      ],
+      "mediana_s": 0.556,
+      "speedup_vs_A": 18.1
+    },
+    "C) concurrente entre tareas: WORKERS=20, 20 tareas de 1 URL": {
+      "tiempos_s": [
+        0.573,
+        0.573,
+        0.588
+      ],
+      "mediana_s": 0.573,
+      "speedup_vs_A": 17.6
+    }
+  },
+  "internet": {
+    "for_await_s": [
+      8.089909817000034,
+      3.6648692030000802,
+      5.058844480000062
+    ],
+    "gather_s": [
+      0.5696822269999302,
+      0.5766348910001398,
+      0.5416894169998159
+    ],
+    "speedup": 8.9
+  }
+}

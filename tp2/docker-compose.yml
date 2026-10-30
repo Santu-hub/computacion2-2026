@@ -1,0 +1,32 @@
+services:
+  api:
+    build: .
+    container_name: plataforma-tareas
+    ports:
+      - "8000:8000"
+
+    environment:
+      # Pool de workers (corrutinas) y capacidad de la cola.
+      - WORKERS=10
+      - MAX_COLA=5000
+      # Timeout por tarea si el cliente no manda uno.
+      - TIMEOUT_DEFECTO=60
+      # proceso | hilo | bloqueante  (ver README; "bloqueante" es solo para medir)
+      - HASH_MODO=proceso
+      # Segundos de gracia para las tareas en curso al recibir SIGTERM.
+      - TIEMPO_APAGADO=20
+
+    volumes:
+      # Los estado_<timestamp>.json quedan accesibles desde el host.
+      - ./datos:/datos
+
+    # Docker espera este tiempo tras SIGTERM antes de mandar SIGKILL. Tiene
+    # que ser MAYOR que TIEMPO_APAGADO, o el volcado se corta a mitad.
+    stop_grace_period: 40s
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/estadisticas', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
